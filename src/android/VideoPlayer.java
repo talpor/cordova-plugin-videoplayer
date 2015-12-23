@@ -2,23 +2,38 @@ package com.moust.cordova.videoplayer;
 
 import android.annotation.TargetApi;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.DialogInterface;
-import android.content.DialogInterface.OnCancelListener;
 import android.content.DialogInterface.OnDismissListener;
 import android.content.res.AssetFileDescriptor;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
 import android.media.MediaPlayer.OnErrorListener;
 import android.media.MediaPlayer.OnPreparedListener;
 import android.net.Uri;
 import android.os.Build;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.VideoView;
 
 import org.apache.cordova.CallbackContext;
@@ -28,6 +43,8 @@ import org.apache.cordova.CordovaResourceApi;
 import org.apache.cordova.PluginResult;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.io.IOException;
 
 public class VideoPlayer extends CordovaPlugin implements OnCompletionListener, OnPreparedListener, OnErrorListener, OnDismissListener {
 
@@ -40,6 +57,8 @@ public class VideoPlayer extends CordovaPlugin implements OnCompletionListener, 
     private Dialog dialog;
 
     private VideoView videoView;
+
+    private Button closeButton;
 
     private MediaPlayer player;
 
@@ -87,24 +106,40 @@ public class VideoPlayer extends CordovaPlugin implements OnCompletionListener, 
             return true;
         }
         else if (action.equals("close")) {
-            if (dialog != null) {
-                if(player.isPlaying()) {
-                    player.stop();
-                }
-                player.release();
-                dialog.dismiss();
-            }
-
-            if (callbackContext != null) {
-                PluginResult result = new PluginResult(PluginResult.Status.OK);
-                result.setKeepCallback(false); // release status callback in JS side
-                callbackContext.sendPluginResult(result);
-                callbackContext = null;
-            }
-
-            return true;
+            return endPlayback(callbackContext);
         }
         return false;
+    }
+
+    private boolean endPlayback(CallbackContext callbackContext) {
+        if (dialog != null) {
+            if(player.isPlaying()) {
+                player.stop();
+            }
+            player.release();
+            dialog.dismiss();
+        }
+
+        if (callbackContext != null) {
+            PluginResult result = new PluginResult(PluginResult.Status.OK);
+            result.setKeepCallback(false); // release status callback in JS side
+            callbackContext.sendPluginResult(result);
+            callbackContext = null;
+        }
+
+        return true;
+    }
+
+    public int pxToDp(int px) {
+        DisplayMetrics displayMetrics = cordova.getActivity().getResources().getDisplayMetrics();
+        int dp = Math.round(px / (displayMetrics.xdpi / DisplayMetrics.DENSITY_DEFAULT));
+        return dp;
+    }
+
+    public int dpToPx(int dp) {
+        DisplayMetrics displayMetrics = cordova.getActivity().getResources().getDisplayMetrics();
+        int px = Math.round(dp * (displayMetrics.xdpi / DisplayMetrics.DENSITY_DEFAULT));
+        return px;
     }
 
     /**
@@ -131,9 +166,8 @@ public class VideoPlayer extends CordovaPlugin implements OnCompletionListener, 
         dialog.setOnDismissListener(this);
 
         // Main container layout
-        LinearLayout main = new LinearLayout(cordova.getActivity());
-        main.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        main.setOrientation(LinearLayout.VERTICAL);
+        RelativeLayout main = new RelativeLayout(cordova.getActivity());
+        main.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         main.setHorizontalGravity(Gravity.CENTER_HORIZONTAL);
         main.setVerticalGravity(Gravity.CENTER_VERTICAL);
 
@@ -142,6 +176,41 @@ public class VideoPlayer extends CordovaPlugin implements OnCompletionListener, 
         // videoView.setVideoURI(uri);
         // videoView.setVideoPath(path);
         main.addView(videoView);
+
+        //CloseFrame
+        FrameLayout closeFrame = new FrameLayout(cordova.getActivity());
+        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+        closeFrame.setLayoutParams(params);
+
+        try {
+            ImageButton closeButton = new ImageButton(cordova.getActivity());
+            RelativeLayout.LayoutParams closeButtonParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            closeButtonParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+            closeButton.setLayoutParams(closeButtonParams);
+            closeButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            closeButton.setBackground(null);
+            Resources res = cordova.getActivity().getResources();
+            Bitmap bmp = BitmapFactory.decodeStream(res.getAssets().open("www/assets/images/videoclose.png"));
+            Bitmap b = Bitmap.createScaledBitmap(bmp, dpToPx(75), dpToPx(75), true);
+            closeButton.setImageBitmap(b);
+
+            //Drawable d = Drawable.createFromStream(res.getAssets().open("www/assets/images/videoclose.png"), null);
+            //closeButton.setImageDrawable(d);
+
+            closeButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Log.d(LOG_TAG, "closing video from native UI");
+                    endPlayback(null);
+                }
+            });
+            closeFrame.addView(closeButton);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        main.addView(closeFrame);
 
         player = new MediaPlayer();
         player.setOnPreparedListener(this);

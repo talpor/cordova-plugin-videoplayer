@@ -25,6 +25,8 @@
 
         <source-file src="src/android/VideoPlayer.java" target-dir="src/com/moust/cordova/videoplayer" />
 
+        <asset src="assets" target="assets/images" />
+
     </platform>
 
 </plugin>
