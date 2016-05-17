@@ -130,6 +130,54 @@ public class VideoPlayer extends CordovaPlugin implements OnCompletionListener, 
         return true;
     }
 
+    private boolean pausePlayback(CallbackContext callbackContext) {
+        if (dialog != null) {
+            if(player.isPlaying()) {
+                player.pause();
+            }
+        }
+
+        if (callbackContext != null) {
+            PluginResult result = new PluginResult(PluginResult.Status.OK);
+            result.setKeepCallback(true);
+            callbackContext.sendPluginResult(result);
+            callbackContext = null;
+        }
+
+        return true;
+    }
+
+    private boolean startPlayback(CallbackContext callbackContext) {
+        if (dialog != null) {
+            if(!player.isPlaying()) {
+                player.start();
+            }
+        }
+
+        if (callbackContext != null) {
+            PluginResult result = new PluginResult(PluginResult.Status.OK);
+            result.setKeepCallback(true);
+            callbackContext.sendPluginResult(result);
+            callbackContext = null;
+        }
+
+        return true;
+    }
+
+    private void seekPlayback(int msecs){
+        if (dialog != null) {
+            int position = player.getCurrentPosition();
+            player.seekTo(position + msecs);
+        }
+    }
+
+    private boolean isPlaying() {
+        if (dialog != null) {
+            return player.isPlaying();
+        }
+        return false;
+    }
+
     public int pxToDp(int px) {
         DisplayMetrics displayMetrics = cordova.getActivity().getResources().getDisplayMetrics();
         int dp = Math.round(px / (displayMetrics.xdpi / DisplayMetrics.DENSITY_DEFAULT));
@@ -212,6 +260,100 @@ public class VideoPlayer extends CordovaPlugin implements OnCompletionListener, 
 
         main.addView(closeFrame);
 
+        // VideoControlsFrame
+        RelativeLayout controlsFrame = new RelativeLayout(cordova.getActivity());
+        RelativeLayout.LayoutParams controlParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        controlParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        // controlParams.addRule(RelativeLayout.CENTER_IN_PARENT, RelativeLayout.TRUE);
+        controlsFrame.setLayoutParams(controlParams);
+        controlsFrame.setGravity(Gravity.CENTER);
+
+        ImageButton playButton = new ImageButton(cordova.getActivity());
+        try {
+            RelativeLayout.LayoutParams playButtonParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            playButtonParams.addRule(RelativeLayout.CENTER_IN_PARENT);
+            playButton.setLayoutParams(playButtonParams);
+            playButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            playButton.setBackground(null);
+            Resources res = cordova.getActivity().getResources();
+            Bitmap bmp = BitmapFactory.decodeStream(res.getAssets().open("www/assets/images/videopause.png"));
+            Bitmap b = Bitmap.createScaledBitmap(bmp, dpToPx(75), dpToPx(75), true);
+            playButton.setImageBitmap(b);
+
+            playButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Resources res = cordova.getActivity().getResources();
+                    try{
+                        if(isPlaying()){
+                            Bitmap bmp = BitmapFactory.decodeStream(res.getAssets().open("www/assets/images/videoplay.png"));
+                            Bitmap b = Bitmap.createScaledBitmap(bmp, dpToPx(75), dpToPx(75), true);
+                            ((ImageButton)v).setImageBitmap(b);
+                            Log.d(LOG_TAG, "pausing video from native UI");
+                            pausePlayback(null);
+                        }else{
+                            Bitmap bmp = BitmapFactory.decodeStream(res.getAssets().open("www/assets/images/videopause.png"));
+                            Bitmap b = Bitmap.createScaledBitmap(bmp, dpToPx(75), dpToPx(75), true);
+                            ((ImageButton)v).setImageBitmap(b);
+                            Log.d(LOG_TAG, "pausing video from native UI");
+                            startPlayback(null);
+                        }
+                    } catch (IOException e){
+                        e.printStackTrace();
+                    }
+                }
+            });
+            controlsFrame.addView(playButton);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            ImageButton seekForwardButton = new ImageButton(cordova.getActivity());
+            RelativeLayout.LayoutParams seekForwardParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            seekForwardParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+            //seekForwardParams.setMargins(20, 0, 0, 0);
+            seekForwardButton.setLayoutParams(seekForwardParams);
+            seekForwardButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            seekForwardButton.setBackground(null);
+            Resources res = cordova.getActivity().getResources();
+            Bitmap bmp = BitmapFactory.decodeStream(res.getAssets().open("www/assets/images/video20sec.png"));
+            Bitmap b = Bitmap.createScaledBitmap(bmp, dpToPx(75), dpToPx(75), true);
+            seekForwardButton.setImageBitmap(b);
+
+            seekForwardButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    seekPlayback(3000);
+                }
+            });
+            controlsFrame.addView(seekForwardButton);
+
+            ImageButton seekBackButton = new ImageButton(cordova.getActivity());
+            RelativeLayout.LayoutParams seekBackParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            seekBackParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+            //seekBackParams.setMargins(0, 0, 20, 0);
+            seekBackButton.setLayoutParams(seekBackParams);
+            seekBackButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            seekBackButton.setBackground(null);
+            Bitmap backBmp = BitmapFactory.decodeStream(res.getAssets().open("www/assets/images/video20sec.png"));
+            Bitmap backB = Bitmap.createScaledBitmap(backBmp, dpToPx(75), dpToPx(75), true);
+            seekBackButton.setImageBitmap(backB);
+
+            seekBackButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    seekPlayback(-3000);
+                }
+            });
+            controlsFrame.addView(seekBackButton);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        main.addView(controlsFrame);
         player = new MediaPlayer();
         player.setOnPreparedListener(this);
         player.setOnCompletionListener(this);
